@@ -120,7 +120,7 @@ class Service:
     def run(self, port: int):
         self.flask_app.run(port = port)
 
-    def add_rule(self, rule: str, cmd: str, args: Union[str, List[str]], ret: str):
+    def add_rule(self, rule: str, cmd: str, args: Union[str, List[str], None], ret: str):
         view_func = self._process_request(cmd, args, ret)
         self.flask_app.add_url_rule('/' + rule, endpoint=rule, view_func=view_func, methods=['GET', 'POST'])
 
