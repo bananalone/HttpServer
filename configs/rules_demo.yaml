@@ -1,0 +1,18 @@
+lsdir:
+  cmd: ls $path
+  args: path
+  return: text
+
+sum:
+  cmd: python ./service/sum.py $a $b
+  args:
+    - a
+    - b
+  return: json
+
+upload:
+  cmd: python ./service/upload.py $file $files ./saved
+  args:
+    - file
+    - files
+  return: json

@@ -1,0 +1,11 @@
+log:
+  format: "[%(levelname)s] %(asctime)s\n%(message)s"
+  stream: True
+  stream_level: 10
+  file: "./logs"
+  file_level: 20
+
+server:
+  rules: './configs/rules_demo.yaml'
+  port: 8080
+  # temp_root: './temp'
