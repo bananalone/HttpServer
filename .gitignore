@@ -1,6 +1,9 @@
 envs
 .vscode
 .DS_Store
+assets
+logs
+saved
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

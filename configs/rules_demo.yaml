@@ -16,3 +16,13 @@ upload:
     - file
     - files
   return: json
+
+download:
+  cmd: python ./service/download.py $file
+  args: file
+  return: file
+
+about:
+  cmd: python ./service/about.py ./configs/rules_demo.yaml
+  args: ~
+  return: text

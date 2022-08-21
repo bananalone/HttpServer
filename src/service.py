@@ -102,7 +102,7 @@ class ResultParser:
     def file(self) -> Response:
         if not self._success():
             raise Exception(self._NO_RESULT)
-        file_path = Path(self.result)
+        file_path = Path(self.result).absolute()
         if not file_path.exists() or not file_path.is_file():
             raise Exception(self._NO_RESULT)
         response = make_response(send_file(str(file_path)), 200)
@@ -128,8 +128,10 @@ class Service:
         for rule in rules:
             self.add_rule(rule, rules[rule]['cmd'], rules[rule]['args'], rules[rule]['return'])
 
-    def _process_request(self, cmd: str, args: Union[str, List[str]], ret: str):
-        if not isinstance(args, list):
+    def _process_request(self, cmd: str, args: Union[str, List[str], None], ret: str):
+        if args is None:
+            args = []
+        elif isinstance(args, str):
             args = [args]
         command = Command(cmd)
         def view_func():
