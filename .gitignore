@@ -4,6 +4,7 @@ envs
 assets
 logs
 saved
+test
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

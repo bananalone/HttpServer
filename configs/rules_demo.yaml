@@ -1,6 +1,6 @@
-lsdir:
-  cmd: ls $path
-  args: path
+hello:
+  cmd: echo hello $name
+  args: name
   return: text
 
 sum:
@@ -24,5 +24,15 @@ download:
 
 about:
   cmd: python ./service/about.py ./configs/rules_demo.yaml
+  args: ~
+  return: text
+
+pyversion:
+  cmd: python --version
+  args: ~
+  return: text
+
+cwd:
+  cmd: pwd
   args: ~
   return: text

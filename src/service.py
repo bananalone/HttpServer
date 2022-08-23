@@ -1,7 +1,8 @@
 from pathlib import Path
+import shlex
 from string import Template
 from typing import List, Union
-import os
+import subprocess
 import uuid
 import tempfile
 
@@ -12,12 +13,18 @@ class Command:
     def __init__(self, cmd: str) -> None:
         self.raw_cmd = cmd
 
-    def __call__(self, args: dict) -> str:
+    def __call__(self, args: dict, output=None) -> str:
         t = Template(self.raw_cmd)
+        for arg in args:
+            args[arg] = shlex.quote(args[arg])
         cmd = t.substitute(args)
-        with os.popen(cmd) as p:
-            result = p.read().strip()
-        return result
+        p = subprocess.run(cmd, capture_output=True, text=True, shell=True)    
+        if output:
+            msg = f'command: {cmd}\n' + \
+                   'result: ' + (p.stdout.strip() if p.stdout is not None else '') + '\n' + \
+                   'error: ' + p.stderr.strip() if p.stderr is not None else ''
+            output(msg)   
+        return p.stdout, p.stderr
 
 
 class RequestParser:
@@ -78,7 +85,6 @@ class RequestParser:
 class ResultParser:
     def __init__(self, result: str) -> None:
         self.result = result
-        self._NO_RESULT = 'No Result'
         self.map = dict()
         self.map['text'] = self.text
         self.map['json'] = self.json
@@ -88,28 +94,21 @@ class ResultParser:
         return self.map[format]()
 
     def text(self) -> Response:
-        if not self._success():
-            raise Exception(self._NO_RESULT)
         return make_response(self.result, 200)
 
     def json(self) -> Response:
-        if not self._success():
-            raise Exception(self._NO_RESULT)
         response = make_response(self.result, 200)
         response.headers['Content-Type'] = 'application/json'
         return response
 
     def file(self) -> Response:
-        if not self._success():
-            raise Exception(self._NO_RESULT)
         file_path = Path(self.result).absolute()
-        if not file_path.exists() or not file_path.is_file():
-            raise Exception(self._NO_RESULT)
+        if not file_path.exists():
+            raise Exception(f'{file_path} does not exists')
+        if not file_path.is_file():
+            raise Exception(f'{str(file_path)} is not a file')
         response = make_response(send_file(str(file_path)), 200)
         return response
-
-    def _success(self) -> bool:
-        return True if self.result != '' else False
 
 
 class Service:
@@ -147,9 +146,11 @@ class Service:
                     self.requestParser.clear()
                     raise Exception(f'{arg} not found')
                 parsed_params[arg] = arg_value
-            result = command(parsed_params)
+            stdout, stderr = command(parsed_params, self.flask_app.logger.info)
+            if stderr:
+                raise Exception(f'[subprocess error] {stderr}')
             self.requestParser.clear()
-            result = ResultParser(result)
+            result = ResultParser(stdout)
             return result.to(ret)
         return view_func
 
