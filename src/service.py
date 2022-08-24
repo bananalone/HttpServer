@@ -5,6 +5,7 @@ from typing import List, Union
 import subprocess
 import uuid
 import tempfile
+import re
 
 from flask import Flask, request, Response, make_response, send_file
 
@@ -18,13 +19,13 @@ class Command:
         for arg in args:
             args[arg] = shlex.quote(args[arg])
         cmd = t.substitute(args)
-        p = subprocess.run(cmd, capture_output=True, text=True, shell=True)    
+        p = subprocess.run(cmd, capture_output=True, text=True, shell=True)   
         if output:
             msg = f'command: {cmd}\n' + \
                    'result: ' + (p.stdout.strip() if p.stdout is not None else '') + '\n' + \
                    'error: ' + p.stderr.strip() if p.stderr is not None else ''
-            output(msg)   
-        return p.stdout, p.stderr
+            output(msg)
+        return p.stdout, p.stderr, p.returncode
 
 
 class RequestParser:
@@ -83,26 +84,32 @@ class RequestParser:
 
 
 class ResultParser:
-    def __init__(self, result: str) -> None:
-        self.result = result
+    def __init__(self, pattern: Union[str, None]) -> None:
+        self.pattern = re.compile(pattern) if pattern else None
         self.map = dict()
         self.map['text'] = self.text
         self.map['json'] = self.json
         self.map['file'] = self.file
 
-    def to(self, format: str) -> Response:
-        return self.map[format]()
+    def _parse(self, stdout: str) -> str:
+        return '\n'.join(self.pattern.findall(stdout)) if self.pattern else stdout
 
-    def text(self) -> Response:
-        return make_response(self.result, 200)
+    def to(self, stdout: str, response: str) -> Response:
+        return self.map[response](stdout)
 
-    def json(self) -> Response:
-        response = make_response(self.result, 200)
+    def text(self, stdout: str) -> Response:
+        result = self._parse(stdout)
+        return make_response(result)
+
+    def json(self, stdout: str) -> Response:
+        result = self._parse(stdout)
+        response = make_response(result)
         response.headers['Content-Type'] = 'application/json'
         return response
 
-    def file(self) -> Response:
-        file_path = Path(self.result).absolute()
+    def file(self, stdout: str) -> Response:
+        result = self._parse(stdout)
+        file_path = Path(result).absolute()
         if not file_path.exists():
             raise Exception(f'{file_path} does not exists')
         if not file_path.is_file():
@@ -119,20 +126,21 @@ class Service:
     def run(self, port: int):
         self.flask_app.run(port = port)
 
-    def add_rule(self, rule: str, cmd: str, args: Union[str, List[str], None], ret: str):
-        view_func = self._process_request(cmd, args, ret)
+    def add_rule(self, rule: str, cmd: str, args: Union[str, List[str], None], pattern: str, res: str):
+        view_func = self._process_request(cmd, args, pattern, res)
         self.flask_app.add_url_rule('/' + rule, endpoint=rule, view_func=view_func, methods=['GET', 'POST'])
 
     def add_rules(self, rules: dict):
         for rule in rules:
-            self.add_rule(rule, rules[rule]['cmd'], rules[rule]['args'], rules[rule]['return'])
+            self.add_rule(rule, rules[rule]['cmd'], rules[rule]['args'], rules[rule]['pattern'], rules[rule]['response'])
 
-    def _process_request(self, cmd: str, args: Union[str, List[str], None], ret: str):
+    def _process_request(self, cmd: str, args: Union[str, List[str], None], pattern:str, res: str):
         if args is None:
             args = []
         elif isinstance(args, str):
             args = [args]
         command = Command(cmd)
+        resultParser = ResultParser(pattern)
         def view_func():
             parsed_params = {
                 **self.requestParser.parse_get_args(),
@@ -146,12 +154,12 @@ class Service:
                     self.requestParser.clear()
                     raise Exception(f'{arg} not found')
                 parsed_params[arg] = arg_value
-            stdout, stderr = command(parsed_params, self.flask_app.logger.info)
-            if stderr:
+            stdout, stderr, retcode = command(parsed_params, self.flask_app.logger.info)
+            if retcode != 0:
                 raise Exception(f'[subprocess error] {stderr}')
             self.requestParser.clear()
-            result = ResultParser(stdout)
-            return result.to(ret)
+            result = resultParser.to(stdout + '\n\n' + stderr, res)
+            return result
         return view_func
 
 

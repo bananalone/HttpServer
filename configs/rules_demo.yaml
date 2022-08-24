@@ -1,38 +1,51 @@
 hello:
   cmd: echo hello $name
   args: name
-  return: text
+  pattern: ~ 
+  response: text
 
 sum:
   cmd: python ./service/sum.py $a $b
   args:
     - a
     - b
-  return: json
+  pattern: ~ 
+  response: json
 
 upload:
   cmd: python ./service/upload.py $file $files ./saved
   args:
     - file
     - files
-  return: json
+  pattern: ~ 
+  response: json
 
 download:
   cmd: python ./service/download.py $file
   args: file
-  return: file
+  pattern: ~
+  response: file
 
 about:
   cmd: python ./service/about.py ./configs/rules_demo.yaml
   args: ~
-  return: text
+  pattern: ~
+  response: text
 
 pyversion:
   cmd: python --version
   args: ~
-  return: text
+  pattern: ~
+  response: text
 
 cwd:
   cmd: pwd
   args: ~
-  return: text
+  pattern: ~
+  response: text
+
+pred:
+  cmd: 'python ~/Documents/proj_drainage/yolov5/inference.py --weights ~/Documents/proj_drainage/yolov5/best.pt --data ~/proj_drainage/yolov5/data/drainage.yaml --source $img'
+  args: img
+  pattern: '={5} (.*) ={5}'
+  response: file
